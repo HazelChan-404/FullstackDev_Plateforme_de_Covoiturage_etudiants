@@ -1,29 +1,36 @@
 package com.covoiturage.views;
 
-import com.covoiturage.dto.TripDTO;
-import com.vaadin.flow.component.datepicker.DatePicker;
 import java.time.LocalDate;
-import com.covoiturage.service.TripService;
-import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.notification.Notification;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
-import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.router.Route;
-import org.springframework.beans.factory.annotation.Autowired;
-import com.covoiturage.dto.UserDTO;
-import com.covoiturage.service.BookingService;
-import com.vaadin.flow.server.VaadinSession;
-import com.vaadin.flow.component.dialog.Dialog;
-import com.vaadin.flow.component.html.Paragraph;
-import com.vaadin.flow.component.textfield.NumberField;
-import com.vaadin.flow.component.textfield.TextArea;
-
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import com.covoiturage.dto.TripDTO;
+import com.covoiturage.dto.UserDTO;
+import com.covoiturage.service.BookingService;
+import com.covoiturage.service.TripService;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.dialog.Dialog;
+import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.Paragraph;
+import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.textfield.NumberField;
+import com.vaadin.flow.component.textfield.TextArea;
+import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.VaadinSession;
+
 @Route("search-trips")
+@PageTitle("Rechercher un trajet - Covoiturage")
 public class SearchTripsView extends VerticalLayout {
     
     private TripService tripService;
@@ -31,70 +38,160 @@ public class SearchTripsView extends VerticalLayout {
     
     private TextField departureCityField;
     private TextField arrivalCityField;
+    private DatePicker datePicker;
     private Button searchButton;
     private Grid<TripDTO> resultsGrid;
-    private DatePicker datePicker;
-    
     
     public SearchTripsView(TripService tripService, BookingService bookingService) {
         this.tripService = tripService;
         this.bookingService = bookingService;
         
         setSizeFull();
-        setPadding(true);
+        setPadding(false);
+        setSpacing(false);
+        getStyle().set("background", "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)");
         
-        // Formulaire de recherche
-        departureCityField = new TextField("Ville de départ");
-        departureCityField.setPlaceholder("Ex: Paris");
-        departureCityField.setWidth("200px");
+        // Main container
+        VerticalLayout mainContainer = new VerticalLayout();
+        mainContainer.setSizeFull();
+        mainContainer.setPadding(true);
+        mainContainer.setSpacing(true);
+        mainContainer.getStyle()
+            .set("max-width", "1400px")
+            .set("margin", "0 auto")
+            .set("width", "100%")
+            .set("min-height", "100vh");
         
-        arrivalCityField = new TextField("Ville d'arrivée");
-        arrivalCityField.setPlaceholder("Ex: Lyon");
-        arrivalCityField.setWidth("200px");
+        // Search form
+        Div searchForm = createSearchForm();
         
-        datePicker = new DatePicker("Date de départ");
+        // Results grid
+        resultsGrid = createResultsGrid();
+        
+        mainContainer.add(searchForm, resultsGrid);
+        add(mainContainer);
+        
+        // Load all trips initially
+        loadAllActiveTrips();
+    }
+    
+    private Div createSearchForm() {
+        Div form = new Div();
+        form.getStyle()
+            .set("background", "white")
+            .set("padding", "2rem")
+            .set("border-radius", "16px")
+            .set("box-shadow", "0 10px 15px -3px rgba(0, 0, 0, 0.1)")
+            .set("border", "1px solid #e2e8f0")
+            .set("margin-bottom", "2rem");
+        
+        H1 title = new H1("Rechercher un trajet");
+        title.getStyle()
+            .set("margin", "0 0 1.5rem 0")
+            .set("font-size", "1.75rem")
+            .set("font-weight", "700")
+            .set("color", "#1e293b")
+            .set("text-align", "center");
+        
+        HorizontalLayout fields = new HorizontalLayout();
+        fields.setWidthFull();
+        fields.setSpacing(true);
+        fields.setAlignItems(FlexComponent.Alignment.END);
+        fields.getStyle().set("flex-wrap", "wrap");
+        
+        departureCityField = new TextField("Départ");
+        departureCityField.setPlaceholder("Paris");
+        departureCityField.setPrefixComponent(VaadinIcon.MAP_MARKER.create());
+        departureCityField.setWidthFull();
+        departureCityField.getStyle().set("flex", "1");
+        
+        arrivalCityField = new TextField("Arrivée");
+        arrivalCityField.setPlaceholder("Lyon");
+        arrivalCityField.setPrefixComponent(VaadinIcon.MAP_MARKER.create());
+        arrivalCityField.setWidthFull();
+        arrivalCityField.getStyle().set("flex", "1");
+        
+        datePicker = new DatePicker("Date");
         datePicker.setPlaceholder("Optionnel");
-        datePicker.setWidth("200px");
-        datePicker.setMin(LocalDate.now());  // Minimum = aujourd'hui
+        datePicker.setMin(LocalDate.now());
+        datePicker.setClearButtonVisible(true);
+        datePicker.getStyle().set("flex", "1");
         
-        searchButton = new Button("Rechercher");
+        searchButton = new Button("Rechercher", VaadinIcon.SEARCH.create());
+        searchButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_LARGE);
+        searchButton.getStyle()
+            .set("font-weight", "600")
+            .set("padding", "0.75rem 2rem");
         searchButton.addClickListener(e -> handleSearch());
         
-        HorizontalLayout searchLayout = new HorizontalLayout(
-            departureCityField, 
-            arrivalCityField, 
-            datePicker,
-            searchButton
-        );
-        searchLayout.setAlignItems(Alignment.END);
+        fields.add(departureCityField, arrivalCityField, datePicker, searchButton);
         
-        // Grille de résultats
-        resultsGrid = new Grid<>(TripDTO.class, false);
-        resultsGrid.addColumn(TripDTO::getDepartureCity).setHeader("Départ");
-        resultsGrid.addColumn(TripDTO::getArrivalCity).setHeader("Arrivée");
-        resultsGrid.addColumn(trip -> 
+        VerticalLayout formLayout = new VerticalLayout(title, fields);
+        formLayout.setPadding(false);
+        formLayout.setSpacing(true);
+        
+        form.add(formLayout);
+        return form;
+    }
+    
+    private Grid<TripDTO> createResultsGrid() {
+        Grid<TripDTO> grid = new Grid<>(TripDTO.class, false);
+        grid.setHeightFull();
+        grid.getStyle()
+            .set("background", "white")
+            .set("border-radius", "12px")
+            .set("box-shadow", "0 4px 6px -1px rgba(0, 0, 0, 0.1)")
+            .set("border", "1px solid #e2e8f0");
+        
+        grid.addColumn(trip -> trip.getDepartureCity() + " → " + trip.getArrivalCity())
+            .setHeader("Trajet")
+            .setWidth("250px")
+            .setFlexGrow(0);
+        
+        grid.addColumn(trip -> 
             trip.getDepartureDatetime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
-        ).setHeader("Date");
-        resultsGrid.addColumn(TripDTO::getAvailableSeats).setHeader("Places dispo");
-        resultsGrid.addColumn(trip -> trip.getPricePerSeat() + "€").setHeader("Prix/place");
-        resultsGrid.addColumn(TripDTO::getDriverName).setHeader("Conducteur");
-        resultsGrid.addColumn(TripDTO::getStatus).setHeader("Status");
+        ).setHeader("Date").setWidth("150px").setFlexGrow(0);
         
-        resultsGrid.addComponentColumn(trip -> {
-            Button bookButton = new Button("Réserver");
-            bookButton.addClickListener(e -> handleBooking(trip));
-            return bookButton;
-        }).setHeader("Action");
+        grid.addColumn(TripDTO::getAvailableSeats)
+            .setHeader("Places")
+            .setWidth("80px")
+            .setFlexGrow(0);
         
-        resultsGrid.addItemClickListener(event -> {
-            TripDTO selectedTrip = event.getItem();
-            getUI().ifPresent(ui -> ui.navigate(TripDetailsView.class, selectedTrip.getId()));
-        });
+        grid.addColumn(trip -> trip.getPricePerSeat() + "€")
+            .setHeader("Prix")
+            .setWidth("100px")
+            .setFlexGrow(0);
         
-        // Charger tous les trajets actifs au démarrage
-        loadAllActiveTrips();
+        grid.addColumn(TripDTO::getDriverName)
+            .setHeader("Conducteur")
+            .setAutoWidth(true);
         
-        add(searchLayout, resultsGrid);
+        grid.addComponentColumn(trip -> {
+            Button viewButton = new Button("Voir", VaadinIcon.EYE.create());
+            viewButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+            viewButton.addClickListener(e -> 
+                getUI().ifPresent(ui -> ui.navigate(TripDetailsView.class, trip.getId()))
+            );
+            
+            Button bookButton = new Button("Réserver", VaadinIcon.CHECK.create());
+            boolean hasAvailableSeats = trip.getAvailableSeats() != null && trip.getAvailableSeats() > 0;
+            
+            if (hasAvailableSeats) {
+                bookButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_PRIMARY);
+                bookButton.addClickListener(e -> handleBooking(trip));
+            } else {
+                bookButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+                bookButton.setEnabled(false);
+                bookButton.setText("Complet");
+                bookButton.getStyle().set("color", "#94a3b8");
+            }
+            
+            HorizontalLayout actions = new HorizontalLayout(viewButton, bookButton);
+            actions.setSpacing(true);
+            return actions;
+        }).setHeader("Actions").setWidth("200px").setFlexGrow(0);
+        
+        return grid;
     }
     
     private void handleSearch() {
@@ -102,112 +199,110 @@ public class SearchTripsView extends VerticalLayout {
             String departureCity = departureCityField.getValue();
             String arrivalCity = arrivalCityField.getValue();
             
-            if (departureCity == null || departureCity.isEmpty()) {
-                Notification.show("Veuillez entrer une ville de départ", 
-                                3000, Notification.Position.MIDDLE);
+            if (departureCity == null || departureCity.trim().isEmpty()) {
+                showError("Veuillez entrer une ville de départ");
+                departureCityField.focus();
                 return;
             }
-            if (arrivalCity == null || arrivalCity.isEmpty()) {
-                Notification.show("Veuillez entrer une ville d'arrivée", 
-                                3000, Notification.Position.MIDDLE);
+            if (arrivalCity == null || arrivalCity.trim().isEmpty()) {
+                showError("Veuillez entrer une ville d'arrivée");
+                arrivalCityField.focus();
                 return;
             }
             
-            // Rechercher les trajets
             List<TripDTO> trips = tripService.searchTrips(departureCity, arrivalCity);
             
-            // Filtrer par date si une date est sélectionnée
             LocalDate selectedDate = datePicker.getValue();
             if (selectedDate != null) {
                 trips = trips.stream()
                     .filter(trip -> trip.getDepartureDatetime().toLocalDate().equals(selectedDate))
                     .collect(java.util.stream.Collectors.toList());
             }
-
-            
-            if (trips.isEmpty()) {
-                Notification.show("Aucun trajet trouvé pour " + departureCity + " → " + arrivalCity, 
-                                3000, Notification.Position.MIDDLE);
-            } else {
-                Notification.show(trips.size() + " trajet(s) trouvé(s)", 
-                                3000, Notification.Position.MIDDLE);
-            }
             
             resultsGrid.setItems(trips);
             
+            if (trips.isEmpty()) {
+                showInfo("Aucun trajet trouvé");
+            } else {
+                showSuccess(trips.size() + " trajet(s) trouvé(s)");
+            }
+            
         } catch (Exception ex) {
-            Notification.show("Erreur: " + ex.getMessage(), 
-                            3000, Notification.Position.MIDDLE);
+            showError("Erreur: " + ex.getMessage());
         }
     }
     
     private void handleBooking(TripDTO trip) {
-        // 检查用户是否登录
         UserDTO currentUser = (UserDTO) VaadinSession.getCurrent().getAttribute("currentUser");
         if (currentUser == null) {
-            Notification.show("Vous devez être connecté pour réserver", 
-                            3000, Notification.Position.MIDDLE);
+            showError("Vous devez être connecté pour réserver");
             getUI().ifPresent(ui -> ui.navigate(LoginView.class));
             return;
         }
         
-        // 检查是否是自己的行程
         if (trip.getDriverId().equals(currentUser.getId())) {
-            Notification.show("Vous ne pouvez pas réserver votre propre trajet", 
-                            3000, Notification.Position.MIDDLE);
+            showError("Vous ne pouvez pas réserver votre propre trajet");
             return;
         }
         
-        // 创建预订对话框
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Réserver ce trajet");
+        dialog.setWidth("500px");
         
         VerticalLayout dialogLayout = new VerticalLayout();
+        dialogLayout.setPadding(true);
+        dialogLayout.setSpacing(true);
         
-        // 显示行程信息
-        dialogLayout.add(new Paragraph("Trajet: " + trip.getDepartureCity() + " → " + trip.getArrivalCity()));
-        dialogLayout.add(new Paragraph("Date: " + trip.getDepartureDatetime().format(
-            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))));
-        dialogLayout.add(new Paragraph("Prix: " + trip.getPricePerSeat() + "€ / place"));
-        dialogLayout.add(new Paragraph("Places disponibles: " + trip.getAvailableSeats()));
+        // Trip info
+        Div tripInfo = new Div();
+        tripInfo.getStyle()
+            .set("background", "#f8fafc")
+            .set("padding", "1rem")
+            .set("border-radius", "8px")
+            .set("margin-bottom", "1rem");
         
-        // 选择座位数
+        tripInfo.add(
+            new Paragraph("🚗 " + trip.getDepartureCity() + " → " + trip.getArrivalCity()),
+            new Paragraph("📅 " + trip.getDepartureDatetime().format(
+                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))),
+            new Paragraph("💰 " + trip.getPricePerSeat() + "€ / place"),
+            new Paragraph("👥 " + trip.getAvailableSeats() + " places disponibles")
+        );
+        
         NumberField seatsField = new NumberField("Nombre de places");
         seatsField.setValue(1.0);
         seatsField.setMin(1);
         seatsField.setMax(trip.getAvailableSeats());
         seatsField.setStep(1);
-        seatsField.setWidth("200px");
+        seatsField.setWidthFull();
         
-        // 留言给司机
         TextArea messageArea = new TextArea("Message au conducteur (optionnel)");
-        messageArea.setWidth("300px");
+        messageArea.setWidthFull();
+        messageArea.setHeight("100px");
         messageArea.setPlaceholder("Ex: J'arriverai 5 minutes en avance...");
         
-        dialogLayout.add(seatsField, messageArea);
+        dialogLayout.add(tripInfo, seatsField, messageArea);
         
-        // 按钮
-        Button confirmButton = new Button("Confirmer la réservation", e -> {
+        Button confirmButton = new Button("Confirmer", VaadinIcon.CHECK.create());
+        confirmButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        confirmButton.addClickListener(e -> {
             try {
                 Integer seats = seatsField.getValue().intValue();
                 String message = messageArea.getValue();
                 
                 bookingService.createBooking(currentUser.getId(), trip.getId(), seats, message);
                 
-                Notification.show("Réservation envoyée! En attente de confirmation du conducteur.", 
-                                3000, Notification.Position.MIDDLE);
+                showSuccess("Réservation envoyée avec succès!");
                 dialog.close();
-                
-                // Recharger la liste pour mettre à jour les places disponibles
                 handleSearch();
                 
             } catch (Exception ex) {
-                Notification.show("Erreur: " + ex.getMessage(), 
-                                3000, Notification.Position.MIDDLE);
+                showError("Erreur: " + ex.getMessage());
             }
         });
         
         Button cancelButton = new Button("Annuler", e -> dialog.close());
+        cancelButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         
         HorizontalLayout buttonsLayout = new HorizontalLayout(confirmButton, cancelButton);
         dialogLayout.add(buttonsLayout);
@@ -215,13 +310,27 @@ public class SearchTripsView extends VerticalLayout {
         dialog.add(dialogLayout);
         dialog.open();
     }
+    
     private void loadAllActiveTrips() {
         try {
             List<TripDTO> allTrips = tripService.getAllActiveTrips();
             resultsGrid.setItems(allTrips);
         } catch (Exception ex) {
-            Notification.show("Erreur lors du chargement des trajets: " + ex.getMessage(), 
-                            3000, Notification.Position.MIDDLE);
+            showError("Erreur lors du chargement: " + ex.getMessage());
         }
+    }
+    
+    private void showError(String message) {
+        Notification notification = Notification.show("⚠ " + message, 3000, Notification.Position.MIDDLE);
+        notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+    }
+    
+    private void showSuccess(String message) {
+        Notification notification = Notification.show("✓ " + message, 3000, Notification.Position.TOP_CENTER);
+        notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+    }
+    
+    private void showInfo(String message) {
+        Notification.show("ℹ " + message, 3000, Notification.Position.MIDDLE);
     }
 }

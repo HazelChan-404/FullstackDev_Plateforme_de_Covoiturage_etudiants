@@ -1,5 +1,5 @@
--- Co-Voiturage (拼车系统) 数据库表结构
-
+-- 选择数据库
+USE covoiturage_full_stack;
 -- 删除已存在的表（按依赖顺序）
 DROP TABLE IF EXISTS reports;
 DROP TABLE IF EXISTS notifications;

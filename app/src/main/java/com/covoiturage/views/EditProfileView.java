@@ -3,15 +3,24 @@ package com.covoiturage.views;
 import com.covoiturage.dto.UserDTO;
 import com.covoiturage.service.UserService;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.VaadinSession;
 
 @Route("edit-profile")
+@PageTitle("Modifier mon profil - Covoiturage")
 public class EditProfileView extends VerticalLayout {
     
     private UserService userService;
@@ -20,6 +29,7 @@ public class EditProfileView extends VerticalLayout {
     private TextField firstNameField;
     private TextField lastNameField;
     private TextField phoneField;
+    private TextField emailField;
     private TextArea bioArea;
     private Button saveButton;
     private Button cancelButton;
@@ -27,7 +37,6 @@ public class EditProfileView extends VerticalLayout {
     public EditProfileView(UserService userService) {
         this.userService = userService;
         
-        // 检查登录
         currentUser = (UserDTO) VaadinSession.getCurrent().getAttribute("currentUser");
         if (currentUser == null) {
             Notification.show("Vous devez être connecté", 3000, Notification.Position.MIDDLE);
@@ -36,74 +45,146 @@ public class EditProfileView extends VerticalLayout {
         }
         
         setSizeFull();
-        setAlignItems(Alignment.CENTER);
-        setJustifyContentMode(JustifyContentMode.CENTER);
+        setAlignItems(FlexComponent.Alignment.CENTER);
+        setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
+        setPadding(true);
+        getStyle().set("background", "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)");
+        
+        // Form container
+        VerticalLayout formContainer = new VerticalLayout();
+        formContainer.setWidth("600px");
+        formContainer.setAlignItems(FlexComponent.Alignment.STRETCH);
+        formContainer.setPadding(true);
+        formContainer.setSpacing(true);
+        formContainer.getStyle()
+            .set("background", "white")
+            .set("border-radius", "16px")
+            .set("box-shadow", "0 20px 25px -5px rgba(0, 0, 0, 0.1)")
+            .set("border", "1px solid #e2e8f0")
+            .set("padding", "2.5rem");
+        
+        // Header
+        VerticalLayout header = new VerticalLayout();
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setPadding(false);
+        header.setSpacing(true);
+        
+        Div iconContainer = new Div();
+        iconContainer.getStyle()
+            .set("width", "70px")
+            .set("height", "70px")
+            .set("border-radius", "14px")
+            .set("background", "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)")
+            .set("display", "flex")
+            .set("align-items", "center")
+            .set("justify-content", "center")
+            .set("box-shadow", "0 8px 16px -4px rgba(139, 92, 246, 0.4)")
+            .set("margin-bottom", "1rem");
+        
+        Icon editIcon = VaadinIcon.EDIT.create();
+        editIcon.setSize("35px");
+        editIcon.getStyle().set("color", "white");
+        iconContainer.add(editIcon);
         
         H1 title = new H1("Modifier mon profil");
+        title.getStyle()
+            .set("margin", "0")
+            .set("font-size", "2rem")
+            .set("font-weight", "700")
+            .set("color", "#1e293b");
         
-        // Champs du formulaire
+        header.add(iconContainer, title);
+        formContainer.add(header);
+        
+        // Email field (read-only)
+        emailField = new TextField("Email");
+        emailField.setValue(currentUser.getEmail());
+        emailField.setReadOnly(true);
+        emailField.setWidthFull();
+        emailField.setPrefixComponent(VaadinIcon.ENVELOPE.create());
+        emailField.setHelperText("L'email ne peut pas être modifié");
+        emailField.getStyle()
+            .set("margin-top", "1rem")
+            .set("background", "#f8fafc");
+        
+        // Name fields
+        HorizontalLayout nameRow = new HorizontalLayout();
+        nameRow.setWidthFull();
+        nameRow.setSpacing(true);
+        
         firstNameField = new TextField("Prénom");
         firstNameField.setValue(currentUser.getFirstName());
         firstNameField.setRequired(true);
-        firstNameField.setWidth("400px");
+        firstNameField.setPrefixComponent(VaadinIcon.USER.create());
+        firstNameField.getStyle().set("flex", "1");
         
         lastNameField = new TextField("Nom");
         lastNameField.setValue(currentUser.getLastName());
         lastNameField.setRequired(true);
-        lastNameField.setWidth("400px");
+        lastNameField.setPrefixComponent(VaadinIcon.USER.create());
+        lastNameField.getStyle().set("flex", "1");
         
+        nameRow.add(firstNameField, lastNameField);
+        
+        // Phone field
         phoneField = new TextField("Téléphone");
         if (currentUser.getPhone() != null) {
             phoneField.setValue(currentUser.getPhone());
         }
-        phoneField.setWidth("400px");
-        phoneField.setPlaceholder("Ex: 0612345678");
+        phoneField.setWidthFull();
+        phoneField.setPrefixComponent(VaadinIcon.PHONE.create());
+        phoneField.setPlaceholder("06 12 34 56 78");
+        phoneField.setHelperText("Optionnel");
         
+        // Bio field
         bioArea = new TextArea("Bio");
         if (currentUser.getBio() != null) {
             bioArea.setValue(currentUser.getBio());
         }
-        bioArea.setWidth("400px");
+        bioArea.setWidthFull();
         bioArea.setHeight("150px");
         bioArea.setPlaceholder("Parlez un peu de vous...");
         bioArea.setMaxLength(500);
         bioArea.setHelperText("Maximum 500 caractères");
         
-        // Info non modifiable
-        TextField emailField = new TextField("Email");
-        emailField.setValue(currentUser.getEmail());
-        emailField.setReadOnly(true);
-        emailField.setWidth("400px");
-        emailField.setHelperText("L'email ne peut pas être modifié");
+        formContainer.add(emailField, nameRow, phoneField, bioArea);
         
-        // Boutons
-        saveButton = new Button("💾 Enregistrer", e -> handleSave());
-        saveButton.getStyle().set("background-color", "#4CAF50").set("color", "white");
+        // Action buttons
+        HorizontalLayout buttons = new HorizontalLayout();
+        buttons.setWidthFull();
+        buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
+        buttons.setSpacing(true);
+        buttons.getStyle().set("margin-top", "1.5rem");
         
-        cancelButton = new Button("Annuler", e -> {
+        saveButton = new Button("💾 Enregistrer", VaadinIcon.CHECK.create());
+        saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_LARGE);
+        saveButton.getStyle().set("font-weight", "600");
+        saveButton.addClickListener(e -> handleSave());
+        
+        cancelButton = new Button("Annuler", VaadinIcon.CLOSE.create());
+        cancelButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        cancelButton.addClickListener(e -> {
             getUI().ifPresent(ui -> ui.navigate(ProfileView.class, currentUser.getId()));
         });
         
-        add(
-            title,
-            emailField,
-            firstNameField,
-            lastNameField,
-            phoneField,
-            bioArea,
-            saveButton,
-            cancelButton
-        );
+        buttons.add(saveButton, cancelButton);
+        formContainer.add(buttons);
+        
+        add(formContainer);
     }
     
     private void handleSave() {
         try {
+            // Validation
+            if (!validateForm()) {
+                return;
+            }
+            
             String firstName = firstNameField.getValue();
             String lastName = lastNameField.getValue();
             String phone = phoneField.getValue();
             String bio = bioArea.getValue();
             
-            // Appeler le service
             UserDTO updatedUser = userService.updateProfile(
                 currentUser.getId(), 
                 firstName, 
@@ -112,18 +193,43 @@ public class EditProfileView extends VerticalLayout {
                 bio
             );
             
-            // Mettre à jour la session
             VaadinSession.getCurrent().setAttribute("currentUser", updatedUser);
             
-            Notification.show("Profil mis à jour avec succès!", 
-                            3000, Notification.Position.MIDDLE);
+            Notification notification = Notification.show(
+                "✓ Profil mis à jour avec succès! 🎉",
+                4000,
+                Notification.Position.TOP_CENTER
+            );
+            notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             
-            // Rediriger vers le profil
             getUI().ifPresent(ui -> ui.navigate(ProfileView.class, updatedUser.getId()));
             
         } catch (Exception ex) {
-            Notification.show("Erreur: " + ex.getMessage(), 
-                            3000, Notification.Position.MIDDLE);
+            Notification notification = Notification.show(
+                "⚠ Erreur: " + ex.getMessage(),
+                4000,
+                Notification.Position.MIDDLE
+            );
+            notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
         }
+    }
+    
+    private boolean validateForm() {
+        if (firstNameField.getValue().trim().isEmpty()) {
+            showError("Le prénom est obligatoire");
+            firstNameField.focus();
+            return false;
+        }
+        if (lastNameField.getValue().trim().isEmpty()) {
+            showError("Le nom est obligatoire");
+            lastNameField.focus();
+            return false;
+        }
+        return true;
+    }
+    
+    private void showError(String message) {
+        Notification notification = Notification.show("⚠ " + message, 3000, Notification.Position.MIDDLE);
+        notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
     }
 }

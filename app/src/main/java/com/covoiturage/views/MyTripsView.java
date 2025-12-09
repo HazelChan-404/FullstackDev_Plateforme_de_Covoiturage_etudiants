@@ -1,26 +1,32 @@
 package com.covoiturage.views;
 
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
 import com.covoiturage.dto.BookingDTO;
 import com.covoiturage.dto.TripDTO;
 import com.covoiturage.dto.UserDTO;
 import com.covoiturage.service.BookingService;
 import com.covoiturage.service.TripService;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.html.H2;
-import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.Paragraph;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.VaadinSession;
 
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-
 @Route("my-trips")
+@PageTitle("Mes trajets - Covoiturage")
 public class MyTripsView extends VerticalLayout {
     
     private TripService tripService;
@@ -33,7 +39,6 @@ public class MyTripsView extends VerticalLayout {
         this.tripService = tripService;
         this.bookingService = bookingService;
         
-        // 检查登录
         currentUser = (UserDTO) VaadinSession.getCurrent().getAttribute("currentUser");
         if (currentUser == null) {
             Notification.show("Vous devez être connecté", 3000, Notification.Position.MIDDLE);
@@ -42,34 +47,129 @@ public class MyTripsView extends VerticalLayout {
         }
         
         setSizeFull();
-        setPadding(true);
+        setPadding(false);
+        setSpacing(false);
+        getStyle().set("background", "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)");
         
-        H2 title = new H2("Mes trajets publiés");
+        VerticalLayout mainContainer = new VerticalLayout();
+        mainContainer.setSizeFull();
+        mainContainer.setPadding(true);
+        mainContainer.setSpacing(true);
+        mainContainer.getStyle().set("max-width", "1400px").set("margin", "0 auto");
         
-        // Grille des trajets
-        tripsGrid = new Grid<>(TripDTO.class, false);
-        tripsGrid.addColumn(trip -> 
-            trip.getDepartureCity() + " → " + trip.getArrivalCity()
-        ).setHeader("Trajet");
-        tripsGrid.addColumn(trip -> 
-            trip.getDepartureDatetime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
-        ).setHeader("Date");
-        tripsGrid.addColumn(TripDTO::getAvailableSeats).setHeader("Places dispo");
-        tripsGrid.addColumn(TripDTO::getTotalSeats).setHeader("Places total");
-        tripsGrid.addColumn(trip -> trip.getPricePerSeat() + "€").setHeader("Prix");
-        tripsGrid.addColumn(TripDTO::getStatus).setHeader("Status");
+        // Header
+        Div header = new Div();
+        header.getStyle()
+            .set("background", "white")
+            .set("padding", "2rem")
+            .set("border-radius", "16px")
+            .set("box-shadow", "0 4px 6px -1px rgba(0, 0, 0, 0.1)")
+            .set("border", "1px solid #e2e8f0")
+            .set("margin-bottom", "1.5rem");
         
-        // Bouton pour voir les réservations
-        tripsGrid.addComponentColumn(trip -> {
-            Button viewBookingsButton = new Button("Voir réservations");
-            viewBookingsButton.addClickListener(e -> showBookings(trip));
-            return viewBookingsButton;
-        }).setHeader("Actions");
+        H1 title = new H1("Mes trajets publiés");
+        title.getStyle()
+            .set("margin", "0")
+            .set("font-size", "2rem")
+            .set("font-weight", "700")
+            .set("color", "#1e293b");
         
-        // Charger les trajets du conducteur
+        header.add(title);
+        
+        // Grid
+        tripsGrid = createTripsGrid();
+        
+        mainContainer.add(header, tripsGrid);
+        add(mainContainer);
+        
         loadMyTrips();
+    }
+    
+    private Grid<TripDTO> createTripsGrid() {
+        Grid<TripDTO> grid = new Grid<>(TripDTO.class, false);
+        grid.setHeightFull();
+        grid.getStyle()
+            .set("background", "white")
+            .set("border-radius", "12px")
+            .set("box-shadow", "0 4px 6px -1px rgba(0, 0, 0, 0.1)")
+            .set("border", "1px solid #e2e8f0");
         
-        add(title, tripsGrid);
+        grid.addColumn(trip -> trip.getDepartureCity() + " → " + trip.getArrivalCity())
+            .setHeader("Trajet")
+            .setWidth("300px")
+            .setFlexGrow(0)
+            .setAutoWidth(true);
+        
+        grid.addColumn(trip -> 
+            trip.getDepartureDatetime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+        ).setHeader("Date").setWidth("150px").setFlexGrow(0);
+        
+        grid.addColumn(trip -> 
+            trip.getAvailableSeats() + "/" + trip.getTotalSeats()
+        ).setHeader("Places").setWidth("100px").setFlexGrow(0);
+        
+        grid.addColumn(trip -> trip.getPricePerSeat() + "€")
+            .setHeader("Prix")
+            .setWidth("100px")
+            .setFlexGrow(0);
+        
+        grid.addComponentColumn(trip -> {
+            Div statusBadge = new Div();
+            String status = trip.getStatus();
+            String text, color, bgColor;
+            
+            switch (status) {
+                case "active":
+                    text = "✓ Actif";
+                    color = "#10b981";
+                    bgColor = "rgba(16, 185, 129, 0.1)";
+                    break;
+                case "completed":
+                    text = "✓ Terminé";
+                    color = "#6b7280";
+                    bgColor = "rgba(107, 114, 128, 0.1)";
+                    break;
+                case "cancelled":
+                    text = "✗ Annulé";
+                    color = "#ef4444";
+                    bgColor = "rgba(239, 68, 68, 0.1)";
+                    break;
+                default:
+                    text = status;
+                    color = "#64748b";
+                    bgColor = "rgba(100, 116, 139, 0.1)";
+            }
+            
+            statusBadge.setText(text);
+            statusBadge.getStyle()
+                .set("padding", "4px 12px")
+                .set("border-radius", "12px")
+                .set("font-size", "0.875rem")
+                .set("font-weight", "600")
+                .set("color", color)
+                .set("background", bgColor)
+                .set("display", "inline-block");
+            
+            return statusBadge;
+        }).setHeader("Statut").setWidth("120px").setFlexGrow(0);
+        
+        grid.addComponentColumn(trip -> {
+            Button viewBookingsButton = new Button("Réservations", VaadinIcon.USERS.create());
+            viewBookingsButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_PRIMARY);
+            viewBookingsButton.addClickListener(e -> showBookings(trip));
+            
+            Button viewDetailsButton = new Button("Détails", VaadinIcon.EYE.create());
+            viewDetailsButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+            viewDetailsButton.addClickListener(e -> 
+                getUI().ifPresent(ui -> ui.navigate(TripDetailsView.class, trip.getId()))
+            );
+            
+            HorizontalLayout actions = new HorizontalLayout(viewBookingsButton, viewDetailsButton);
+            actions.setSpacing(true);
+            return actions;
+        }).setHeader("Actions").setAutoWidth(true);
+        
+        return grid;
     }
     
     private void loadMyTrips() {
@@ -82,26 +182,33 @@ public class MyTripsView extends VerticalLayout {
                                 3000, Notification.Position.MIDDLE);
             }
         } catch (Exception ex) {
-            Notification.show("Erreur: " + ex.getMessage(), 
-                            3000, Notification.Position.MIDDLE);
+            showError("Erreur: " + ex.getMessage());
         }
     }
     
     private void showBookings(TripDTO trip) {
         Dialog dialog = new Dialog();
-        dialog.setWidth("800px");
-        dialog.setHeaderTitle("Réservations pour " + trip.getDepartureCity() + " → " + trip.getArrivalCity());
+        dialog.setWidth("900px");
+        dialog.setHeight("80%");
+        dialog.setHeaderTitle("Réservations - " + trip.getDepartureCity() + " → " + trip.getArrivalCity());
         
         VerticalLayout dialogLayout = new VerticalLayout();
+        dialogLayout.setPadding(true);
+        dialogLayout.setSpacing(true);
         
         try {
             List<BookingDTO> bookings = bookingService.getBookingsByTripId(trip.getId());
             
             if (bookings.isEmpty()) {
-                dialogLayout.add(new Paragraph("Aucune réservation pour ce trajet"));
+                Paragraph noBookings = new Paragraph("Aucune réservation pour ce trajet");
+                noBookings.getStyle()
+                    .set("text-align", "center")
+                    .set("color", "#64748b")
+                    .set("padding", "2rem");
+                dialogLayout.add(noBookings);
             } else {
                 for (BookingDTO booking : bookings) {
-                    VerticalLayout bookingCard = createBookingCard(booking, trip);
+                    Div bookingCard = createBookingCard(booking, trip, dialog);
                     dialogLayout.add(bookingCard);
                 }
             }
@@ -111,86 +218,164 @@ public class MyTripsView extends VerticalLayout {
         }
         
         Button closeButton = new Button("Fermer", e -> dialog.close());
+        closeButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         dialogLayout.add(closeButton);
         
         dialog.add(dialogLayout);
         dialog.open();
     }
     
-    private VerticalLayout createBookingCard(BookingDTO booking, TripDTO trip) {
-        VerticalLayout card = new VerticalLayout();
+    private Div createBookingCard(BookingDTO booking, TripDTO trip, Dialog dialog) {
+        Div card = new Div();
         card.getStyle()
-            .set("border", "1px solid #ddd")
-            .set("border-radius", "8px")
-            .set("padding", "15px")
-            .set("margin-bottom", "10px");
+            .set("background", "white")
+            .set("border", "1px solid #e2e8f0")
+            .set("border-radius", "12px")
+            .set("padding", "1.25rem")
+            .set("margin-bottom", "1rem")
+            .set("box-shadow", "0 2px 4px rgba(0,0,0,0.05)");
         
-        Button passengerButton = new Button(booking.getPassengerName(), e -> {
-            getUI().ifPresent(ui -> ui.navigate(ProfileView.class, booking.getPassengerId()));
-        });
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(true);
+        
+        // Store dialog reference for use in buttons
+        Dialog[] dialogRef = new Dialog[1];
+        
+        // Passenger info
+        HorizontalLayout passengerInfo = new HorizontalLayout();
+        passengerInfo.setAlignItems(FlexComponent.Alignment.CENTER);
+        
+        Button passengerButton = new Button(booking.getPassengerName(), VaadinIcon.USER.create());
+        passengerButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         passengerButton.getStyle()
-            .set("font-size", "18px")
-            .set("font-weight", "bold")
-            .set("background", "none")
-            .set("border", "none")
-            .set("color", "#2196F3")
-            .set("cursor", "pointer")
-            .set("text-decoration", "underline");
-
-        VerticalLayout passengerHeader = new VerticalLayout();
-        passengerHeader.add(new Paragraph("Passager:"), passengerButton);
-        passengerHeader.setSpacing(false);
-        passengerHeader.setPadding(false);
-        Paragraph seats = new Paragraph("Places réservées: " + booking.getSeatsBooked());
-        Paragraph status = new Paragraph("Status: " + booking.getStatus());
+            .set("font-size", "1.1rem")
+            .set("font-weight", "700")
+            .set("color", "#2563eb");
+        passengerButton.addClickListener(e -> 
+            getUI().ifPresent(ui -> ui.navigate(ProfileView.class, booking.getPassengerId()))
+        );
+        
+        Div statusBadge = new Div();
+        String status = booking.getStatus();
+        String text, color, bgColor;
+        
+        switch (status) {
+            case "pending":
+                text = "⏳ En attente";
+                color = "#f59e0b";
+                bgColor = "rgba(245, 158, 11, 0.1)";
+                break;
+            case "accepted":
+                text = "✓ Accepté";
+                color = "#10b981";
+                bgColor = "rgba(16, 185, 129, 0.1)";
+                break;
+            case "rejected":
+                text = "✗ Refusé";
+                color = "#ef4444";
+                bgColor = "rgba(239, 68, 68, 0.1)";
+                break;
+            case "cancelled":
+                text = "🚫 Annulé";
+                color = "#6b7280";
+                bgColor = "rgba(107, 114, 128, 0.1)";
+                break;
+            default:
+                text = status;
+                color = "#64748b";
+                bgColor = "rgba(100, 116, 139, 0.1)";
+        }
+        
+        statusBadge.setText(text);
+        statusBadge.getStyle()
+            .set("padding", "4px 12px")
+            .set("border-radius", "12px")
+            .set("font-size", "0.875rem")
+            .set("font-weight", "600")
+            .set("color", color)
+            .set("background", bgColor);
+        
+        passengerInfo.add(passengerButton, statusBadge);
+        
+        Paragraph seats = new Paragraph("👥 Places réservées: " + booking.getSeatsBooked());
+        seats.getStyle().set("margin", "0").set("color", "#64748b");
+        
+        content.add(passengerInfo, seats);
         
         if (booking.getMessageToDriver() != null && !booking.getMessageToDriver().isEmpty()) {
-            Paragraph message = new Paragraph("Message: " + booking.getMessageToDriver());
-            card.add(passengerHeader, seats, status, message);
-        } else {
-            card.add(passengerHeader, seats, status);
+            Div messageBox = new Div();
+            messageBox.getStyle()
+                .set("background", "#f8fafc")
+                .set("padding", "0.75rem")
+                .set("border-radius", "8px")
+                .set("margin-top", "0.5rem")
+                .set("border-left", "3px solid #2563eb");
+            
+            Paragraph message = new Paragraph("💬 " + booking.getMessageToDriver());
+            message.getStyle()
+                .set("margin", "0")
+                .set("color", "#1e293b")
+                .set("font-style", "italic");
+            
+            messageBox.add(message);
+            content.add(messageBox);
         }
         
-        // Boutons d'action (seulement si status = pending)
         if ("pending".equals(booking.getStatus())) {
-            Button acceptButton = new Button("Accepter", e -> {
+            HorizontalLayout actions = new HorizontalLayout();
+            actions.setSpacing(true);
+            actions.getStyle().set("margin-top", "0.75rem");
+            
+            Button acceptButton = new Button("Accepter", VaadinIcon.CHECK.create());
+            acceptButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SUCCESS);
+            acceptButton.addClickListener(e -> {
                 try {
                     bookingService.acceptBooking(booking.getId(), currentUser.getId());
-                    Notification.show("Réservation acceptée!", 3000, Notification.Position.MIDDLE);
-                    // Recharger
+                    showSuccess("Réservation acceptée!");
+                    // Refresh both trips and bookings data
                     loadMyTrips();
-                    // Fermer le dialogue
-                    card.getParent().ifPresent(parent -> {
-                        Dialog dialog = (Dialog) parent.getParent().orElse(null);
-                        if (dialog != null) dialog.close();
-                    });
+                    // Refresh the current dialog to show updated data
+                    dialog.close();
+                    showBookings(trip);
                 } catch (Exception ex) {
-                    Notification.show("Erreur: " + ex.getMessage(), 3000, Notification.Position.MIDDLE);
+                    showError("Erreur: " + ex.getMessage());
                 }
             });
-            acceptButton.getStyle().set("background-color", "#4CAF50").set("color", "white");
             
-            Button rejectButton = new Button("Refuser", e -> {
+            Button rejectButton = new Button("Refuser", VaadinIcon.CLOSE.create());
+            rejectButton.addThemeVariants(ButtonVariant.LUMO_ERROR);
+            rejectButton.addClickListener(e -> {
                 try {
                     bookingService.rejectBooking(booking.getId(), currentUser.getId());
-                    Notification.show("Réservation refusée", 3000, Notification.Position.MIDDLE);
-                    // Recharger
+                    showInfo("Réservation refusée");
                     loadMyTrips();
-                    // Fermer le dialogue
-                    card.getParent().ifPresent(parent -> {
-                        Dialog dialog = (Dialog) parent.getParent().orElse(null);
-                        if (dialog != null) dialog.close();
-                    });
+                    dialog.close();
+                    showBookings(trip);
                 } catch (Exception ex) {
-                    Notification.show("Erreur: " + ex.getMessage(), 3000, Notification.Position.MIDDLE);
+                    showError("Erreur: " + ex.getMessage());
                 }
             });
-            rejectButton.getStyle().set("background-color", "#f44336").set("color", "white");
             
-            HorizontalLayout buttons = new HorizontalLayout(acceptButton, rejectButton);
-            card.add(buttons);
+            actions.add(acceptButton, rejectButton);
+            content.add(actions);
         }
         
+        card.add(content);
         return card;
+    }
+    
+    private void showError(String message) {
+        Notification notification = Notification.show("⚠ " + message, 3000, Notification.Position.MIDDLE);
+        notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+    }
+    
+    private void showSuccess(String message) {
+        Notification notification = Notification.show("✓ " + message, 3000, Notification.Position.TOP_CENTER);
+        notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+    }
+    
+    private void showInfo(String message) {
+        Notification.show("ℹ " + message, 3000, Notification.Position.MIDDLE);
     }
 }
