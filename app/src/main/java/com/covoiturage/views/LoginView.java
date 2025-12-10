@@ -227,8 +227,18 @@ public class LoginView extends VerticalLayout {
                 );
                 notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                 
-                // Redirection vers la page d'accueil
-                getUI().ifPresent(ui -> ui.navigate(""));
+                // Check for redirect URL in session
+                String redirectUrl = (String) getUI().get().getSession().getAttribute("redirectAfterLogin");
+                getUI().get().getSession().setAttribute("redirectAfterLogin", null); // Clear the session attribute
+                
+                // Redirect to the stored URL or home page
+                getUI().ifPresent(ui -> {
+                    if (redirectUrl != null && !redirectUrl.isEmpty()) {
+                        ui.navigate(redirectUrl);
+                    } else {
+                        ui.navigate("");
+                    }
+                });
             } else {
                 // Notification d'erreur
                 Notification notification = Notification.show(

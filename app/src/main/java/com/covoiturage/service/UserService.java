@@ -131,4 +131,43 @@ public class UserService {
         // 5. 更新Session中的用户信息
         return new UserDTO(updatedUser);
     }
+    
+    /**
+     * 更新用户信息 - 从DTO更新
+     */
+    @Transactional
+    public UserDTO updateUser(UserDTO userDTO) {
+        
+        // 1. 查找用户
+        User user = userRepository.findById(userDTO.getId())
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // 2. 验证必填字段
+        if (userDTO.getFirstName() == null || userDTO.getFirstName().isEmpty()) {
+            throw new RuntimeException("First name is required");
+        }
+        if (userDTO.getLastName() == null || userDTO.getLastName().isEmpty()) {
+            throw new RuntimeException("Last name is required");
+        }
+        if (userDTO.getEmail() == null || userDTO.getEmail().isEmpty()) {
+            throw new RuntimeException("Email is required");
+        }
+        
+        // 3. 检查邮箱是否已被其他用户使用
+        if (!user.getEmail().equals(userDTO.getEmail()) && userRepository.existsByEmail(userDTO.getEmail())) {
+            throw new RuntimeException("Email already exists");
+        }
+        
+        // 4. 更新字段
+        user.setFirstName(userDTO.getFirstName());
+        user.setLastName(userDTO.getLastName());
+        user.setEmail(userDTO.getEmail());
+        user.setPhone(userDTO.getPhone());
+        user.setBio(userDTO.getBio());
+        
+        // 5. 保存
+        User updatedUser = userRepository.save(user);
+        
+        return new UserDTO(updatedUser);
+    }
 }

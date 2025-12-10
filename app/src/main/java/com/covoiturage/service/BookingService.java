@@ -219,6 +219,57 @@ public class BookingService {
     }
     
     /**
+     * 取消预订 - 乘客可以取消自己的预订，司机可以取消自己行程的预订
+     */
+    @Transactional
+    public BookingDTO cancelBooking(Long bookingId, Long userId) {
+        
+        // 1. 查找预订
+        Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new RuntimeException("Réservation introuvable"));
+        
+        // 2. 查找行程
+        Trip trip = tripRepository.findById(booking.getTripId())
+            .orElseThrow(() -> new RuntimeException("Trajet introuvable"));
+        
+        // 3. 验证预订状态 - 只有pending或accepted状态的预订可以取消
+        if (!"pending".equals(booking.getStatus()) && !"accepted".equals(booking.getStatus())) {
+            throw new RuntimeException("Cette réservation ne peut plus être annulée");
+        }
+        
+        // 4. 验证权限 - 乘客可以取消自己的预订，司机可以取消自己行程的预订
+        boolean isPassenger = booking.getPassengerId().equals(userId);
+        boolean isDriver = trip.getDriverId().equals(userId);
+        
+        if (!isPassenger && !isDriver) {
+            throw new RuntimeException("Vous n'avez pas l'autorisation d'annuler cette réservation");
+        }
+        
+        // 5. 更新预订状态
+        String originalStatus = booking.getStatus();
+        booking.setStatus("cancelled");
+        bookingRepository.save(booking);
+        
+        // 6. 如果预订已被接受，需要恢复可用座位
+        if ("accepted".equals(originalStatus)) {
+            trip.setAvailableSeats(trip.getAvailableSeats() + booking.getSeatsBooked());
+            tripRepository.save(trip);
+        }
+        
+        // 7. 返回DTO
+        BookingDTO dto = new BookingDTO(booking);
+        User passenger = userRepository.findById(booking.getPassengerId()).orElse(null);
+        if (passenger != null) {
+            dto.setPassengerName(passenger.getFirstName() + " " + passenger.getLastName());
+        }
+        dto.setDepartureCity(trip.getDepartureCity());
+        dto.setArrivalCity(trip.getArrivalCity());
+        dto.setDepartureDatetime(trip.getDepartureDatetime());
+        
+        return dto;
+    }
+    
+    /**
      * 获取某个乘客的所有预订
      */
     public List<BookingDTO> getBookingsByPassengerId(Long passengerId) {

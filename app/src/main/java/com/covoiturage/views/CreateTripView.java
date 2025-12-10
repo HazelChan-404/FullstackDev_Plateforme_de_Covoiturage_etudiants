@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.covoiturage.dto.TripDTO;
 import com.covoiturage.dto.UserDTO;
+import com.covoiturage.security.SecurityService;
 import com.covoiturage.service.TripService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -33,6 +34,9 @@ public class CreateTripView extends VerticalLayout {
     
     @Autowired
     private TripService tripService;
+    
+    @Autowired
+    private SecurityService securityService;
     
     private TextField departureAddressField;
     private TextField departureCityField;
@@ -234,7 +238,7 @@ public class CreateTripView extends VerticalLayout {
             BigDecimal pricePerSeat = BigDecimal.valueOf(pricePerSeatField.getValue());
             String description = descriptionArea.getValue();
             
-            UserDTO currentUser = (UserDTO) VaadinSession.getCurrent().getAttribute("currentUser");
+            UserDTO currentUser = securityService.getAuthenticatedUser();
             if (currentUser == null) {
                 Notification notification = Notification.show(
                     "Vous devez être connecté pour publier un trajet",

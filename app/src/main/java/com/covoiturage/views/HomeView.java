@@ -1,8 +1,11 @@
 package com.covoiturage.views;
 
 import com.covoiturage.security.SecurityService;
+import com.covoiturage.dto.UserDTO;
+import com.covoiturage.service.UserService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
@@ -10,20 +13,27 @@ import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.textfield.TextArea;
+import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.VaadinSession;
 
 @Route("")
 @PageTitle("Accueil - Covoiturage")
 public class HomeView extends VerticalLayout {
     
     private final SecurityService securityService;
+    private final UserService userService;
     
-    public HomeView(SecurityService securityService) {
+    public HomeView(SecurityService securityService, UserService userService) {
         this.securityService = securityService;
+        this.userService = userService;
         
         // Configuration de la page
         setSizeFull();
@@ -201,6 +211,38 @@ public class HomeView extends VerticalLayout {
         welcomeSection.add(welcomeTitle, welcomeSubtitle);
         content.add(welcomeSection);
         
+        // User actions section (profile and logout)
+        HorizontalLayout userActions = new HorizontalLayout();
+        userActions.setSpacing(true);
+        userActions.setAlignItems(FlexComponent.Alignment.CENTER);
+        userActions.getStyle()
+            .set("gap", "1rem")
+            .set("margin-bottom", "2rem")
+            .set("justify-content", "center");
+        
+        Button editProfileButton = new Button("Modifier mon profil", VaadinIcon.EDIT.create());
+        editProfileButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        editProfileButton.addClickListener(e -> {
+            var userForEdit = securityService.getAuthenticatedUser();
+            if (userForEdit != null) {
+                getUI().ifPresent(ui -> ui.navigate(EditProfileView.class));
+            }
+        });
+        
+        Button notificationsButton = new Button("Notifications", VaadinIcon.BELL.create());
+        notificationsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        notificationsButton.addClickListener(e -> getUI().ifPresent(ui -> ui.navigate(NotificationsView.class)));
+        
+        Button logoutButton = new Button("Déconnexion", VaadinIcon.SIGN_OUT.create());
+        logoutButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        logoutButton.getStyle()
+            .set("color", "#ef4444")
+            .set("font-weight", "600");
+        logoutButton.addClickListener(e -> handleLogout());
+        
+        userActions.add(editProfileButton, notificationsButton, logoutButton);
+        content.add(userActions);
+        
         // Actions rapides
         HorizontalLayout quickActions = new HorizontalLayout();
         quickActions.setSpacing(true);
@@ -222,38 +264,63 @@ public class HomeView extends VerticalLayout {
         quickActions.add(searchTripsButton, createTripButton, myTripsButton);
         content.add(quickActions);
         
-        // Statistiques rapides
-        VerticalLayout statsSection = new VerticalLayout();
-        statsSection.setAlignItems(FlexComponent.Alignment.CENTER);
-        statsSection.setSpacing(true);
-        statsSection.getStyle()
+        // Recommandations et suggestions
+        VerticalLayout recommendationsSection = new VerticalLayout();
+        recommendationsSection.setAlignItems(FlexComponent.Alignment.CENTER);
+        recommendationsSection.setSpacing(true);
+        recommendationsSection.getStyle()
             .set("margin-top", "3rem")
             .set("width", "100%");
         
-        H2 statsTitle = new H2("Votre activité");
-        statsTitle.getStyle()
+        H2 recommendationsTitle = new H2("Suggestions pour vous");
+        recommendationsTitle.getStyle()
             .set("margin", "0 0 1.5rem 0")
             .set("font-size", "1.5rem")
             .set("font-weight", "600")
-            .set("color", "#1e293b");
+            .set("color", "#1e293b")
+            .set("text-align", "center");
         
-        statsSection.add(statsTitle);
+        recommendationsSection.add(recommendationsTitle);
         
-        HorizontalLayout statsCards = new HorizontalLayout();
-        statsCards.setSpacing(true);
-        statsCards.setAlignItems(FlexComponent.Alignment.STRETCH);
-        statsCards.setWidthFull();
-        statsCards.getStyle().set("gap", "1.5rem");
+        // Cartes de suggestions
+        HorizontalLayout recommendationsCards = new HorizontalLayout();
+        recommendationsCards.setSpacing(true);
+        recommendationsCards.setAlignItems(FlexComponent.Alignment.STRETCH);
+        recommendationsCards.setWidthFull();
+        recommendationsCards.getStyle().set("gap", "1.5rem");
         
-        // Statistiques (placeholder pour l'instant)
-        VerticalLayout stat1 = createStatCard("Trajets proposés", "0", VaadinIcon.CAR.create());
-        VerticalLayout stat2 = createStatCard("Réservations", "0", VaadinIcon.CALENDAR.create());
-        VerticalLayout stat3 = createStatCard("Économies réalisées", "0€", VaadinIcon.MONEY.create());
+        // Suggestion 1
+        VerticalLayout suggestion1 = createSuggestionCard(
+            "Proposez un trajet",
+            "Gagnez de l'argent et partagez vos trajets avec la communauté",
+            VaadinIcon.PLUS_CIRCLE,
+            "#10b981"
+        );
         
-        statsCards.add(stat1, stat2, stat3);
-        statsSection.add(statsCards);
+        // Suggestion 2
+        VerticalLayout suggestion2 = createSuggestionCard(
+            "Complétez votre profil",
+            "Ajoutez une photo et une bio pour inspirer plus confiance",
+            VaadinIcon.USER,
+            "#f59e0b"
+        );
         
-        content.add(statsSection);
+        // Suggestion 3
+        VerticalLayout suggestion3 = createSuggestionCard(
+            "Activez les notifications",
+            "Soyez informé des nouveaux trajets correspondant à vos recherches",
+            VaadinIcon.BELL,
+            "#2563eb"
+        );
+        
+        recommendationsCards.add(suggestion1, suggestion2, suggestion3);
+        recommendationsSection.add(recommendationsCards);
+        
+        // Section d'aide rapide
+        Div quickHelpSection = createQuickHelpSection();
+        recommendationsSection.add(quickHelpSection);
+        
+        content.add(recommendationsSection);
         add(content);
     }
     
@@ -337,5 +404,277 @@ public class HomeView extends VerticalLayout {
         
         card.add(icon, statValue, statTitle);
         return card;
+    }
+    
+    private VerticalLayout createSuggestionCard(String title, String description, VaadinIcon icon, String color) {
+        VerticalLayout card = new VerticalLayout();
+        card.setAlignItems(FlexComponent.Alignment.CENTER);
+        card.setSpacing(true);
+        card.setPadding(true);
+        card.getStyle()
+            .set("background", "white")
+            .set("border-radius", "12px")
+            .set("box-shadow", "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)")
+            .set("padding", "1.5rem")
+            .set("flex", "1")
+            .set("text-align", "center")
+            .set("border", "2px solid " + color + "20")
+            .set("cursor", "pointer")
+            .set("transition", "all 0.2s ease");
+        
+        // Add hover effect
+        card.getElement().addEventListener("mouseenter", e -> {
+            card.getStyle()
+                .set("transform", "translateY(-4px)")
+                .set("box-shadow", "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)");
+        });
+        
+        card.getElement().addEventListener("mouseleave", e -> {
+            card.getStyle()
+                .set("transform", "translateY(0)")
+                .set("box-shadow", "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)");
+        });
+        
+        Icon cardIcon = icon.create();
+        cardIcon.setSize("32px");
+        cardIcon.getStyle().set("color", color);
+        
+        H3 cardTitle = new H3(title);
+        cardTitle.getStyle()
+            .set("margin", "0.75rem 0")
+            .set("font-size", "1.1rem")
+            .set("font-weight", "600")
+            .set("color", "#1e293b");
+        
+        Paragraph cardDescription = new Paragraph(description);
+        cardDescription.getStyle()
+            .set("margin", "0")
+            .set("color", "#64748b")
+            .set("font-size", "0.9rem")
+            .set("line-height", "1.5");
+        
+        card.add(cardIcon, cardTitle, cardDescription);
+        return card;
+    }
+    
+    private Div createQuickHelpSection() {
+        Div helpSection = new Div();
+        helpSection.setWidthFull();
+        helpSection.getStyle()
+            .set("background", "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)")
+            .set("border-radius", "12px")
+            .set("padding", "2rem")
+            .set("margin-top", "2rem")
+            .set("border", "1px solid #e2e8f0");
+        
+        H3 helpTitle = new H3("Besoin d'aide ?");
+        helpTitle.getStyle()
+            .set("margin", "0 0 1rem 0")
+            .set("font-size", "1.25rem")
+            .set("font-weight", "600")
+            .set("color", "#1e293b")
+            .set("text-align", "center");
+        
+        Paragraph helpText = new Paragraph("Découvrez comment utiliser notre plateforme, consulter notre FAQ ou contacter le support si vous avez des questions.");
+        helpText.getStyle()
+            .set("margin", "0 0 1.5rem 0")
+            .set("color", "#64748b")
+            .set("text-align", "center")
+            .set("line-height", "1.6");
+        
+        HorizontalLayout helpButtons = new HorizontalLayout();
+        helpButtons.setSpacing(true);
+        helpButtons.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
+        helpButtons.setWidthFull();
+        helpButtons.getStyle().set("gap", "1rem");
+        
+        Button guideButton = new Button("Guide d'utilisation", VaadinIcon.BOOK.create());
+        guideButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        guideButton.addClickListener(e -> {
+            // TODO: Navigate to guide page
+            showInfo("Guide en cours de développement");
+        });
+        
+        Button faqButton = new Button("FAQ", VaadinIcon.QUESTION_CIRCLE.create());
+        faqButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        faqButton.addClickListener(e -> {
+            // TODO: Navigate to FAQ page
+            showInfo("FAQ en cours de développement");
+        });
+        
+        Button supportButton = new Button("Support", VaadinIcon.COMMENTS.create());
+        supportButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        supportButton.addClickListener(e -> {
+            // TODO: Navigate to support page
+            showInfo("Support en cours de développement");
+        });
+        
+        helpButtons.add(guideButton, faqButton, supportButton);
+        
+        helpSection.add(helpTitle, helpText, helpButtons);
+        return helpSection;
+    }
+    
+    private void openEditProfileDialog() {
+        var user = securityService.getAuthenticatedUser();
+        
+        Dialog dialog = new Dialog();
+        dialog.setWidth("600px");
+        dialog.setHeight("auto");
+        
+        VerticalLayout dialogLayout = new VerticalLayout();
+        dialogLayout.setPadding(true);
+        dialogLayout.setSpacing(true);
+        dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
+        
+        // Header
+        H2 title = new H2("👤 Modifier mon profil");
+        title.getStyle()
+            .set("margin", "0")
+            .set("font-size", "1.5rem")
+            .set("font-weight", "700")
+            .set("color", "#1e293b");
+        
+        // Form fields
+        TextField firstNameField = new TextField("Prénom");
+        firstNameField.setValue(user.getFirstName());
+        firstNameField.setRequired(true);
+        firstNameField.setWidthFull();
+        firstNameField.setPrefixComponent(VaadinIcon.USER.create());
+        
+        TextField lastNameField = new TextField("Nom");
+        lastNameField.setValue(user.getLastName());
+        lastNameField.setRequired(true);
+        lastNameField.setWidthFull();
+        lastNameField.setPrefixComponent(VaadinIcon.USER.create());
+        
+        TextField emailField = new TextField("Email");
+        emailField.setValue(user.getEmail());
+        emailField.setReadOnly(true);
+        emailField.setWidthFull();
+        emailField.setPrefixComponent(VaadinIcon.ENVELOPE.create());
+        emailField.setHelperText("L'email ne peut pas être modifié");
+        emailField.getStyle().set("background", "#f8fafc");
+        
+        TextField phoneField = new TextField("Téléphone");
+        if (user.getPhone() != null) {
+            phoneField.setValue(user.getPhone());
+        }
+        phoneField.setWidthFull();
+        phoneField.setPrefixComponent(VaadinIcon.PHONE.create());
+        phoneField.setPlaceholder("06 12 34 56 78");
+        phoneField.setHelperText("Optionnel");
+        
+        TextArea bioArea = new TextArea("Bio");
+        if (user.getBio() != null) {
+            bioArea.setValue(user.getBio());
+        }
+        bioArea.setWidthFull();
+        bioArea.setHeight("120px");
+        bioArea.setPlaceholder("Parlez un peu de vous...");
+        bioArea.setMaxLength(500);
+        bioArea.setHelperText("Maximum 500 caractères");
+        
+        // Buttons
+        HorizontalLayout buttons = new HorizontalLayout();
+        buttons.setWidthFull();
+        buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        buttons.setSpacing(true);
+        
+        Button cancelButton = new Button("Annuler", VaadinIcon.CLOSE.create());
+        cancelButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        cancelButton.addClickListener(e -> dialog.close());
+        
+        Button saveButton = new Button("Enregistrer", VaadinIcon.CHECK.create());
+        saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        saveButton.addClickListener(e -> handleProfileUpdate(
+            dialog, user.getId(), firstNameField, lastNameField, phoneField, bioArea
+        ));
+        
+        buttons.add(cancelButton, saveButton);
+        
+        dialogLayout.add(title, firstNameField, lastNameField, emailField, phoneField, bioArea, buttons);
+        dialog.add(dialogLayout);
+        dialog.open();
+    }
+    
+    private void handleProfileUpdate(Dialog dialog, Long userId, TextField firstNameField, 
+                                   TextField lastNameField, TextField phoneField, TextArea bioArea) {
+        try {
+            // Validation
+            if (firstNameField.getValue().trim().isEmpty()) {
+                showError("Le prénom est obligatoire");
+                firstNameField.focus();
+                return;
+            }
+            if (lastNameField.getValue().trim().isEmpty()) {
+                showError("Le nom est obligatoire");
+                lastNameField.focus();
+                return;
+            }
+            
+            // Update user
+            UserDTO updatedUser = userService.updateProfile(
+                userId,
+                firstNameField.getValue().trim(),
+                lastNameField.getValue().trim(),
+                phoneField.getValue().trim(),
+                bioArea.getValue().trim()
+            );
+            
+            // Update session
+            VaadinSession.getCurrent().setAttribute("currentUser", updatedUser);
+            
+            showSuccess("✓ Profil mis à jour avec succès! 🎉");
+            dialog.close();
+            
+            // Refresh the view to show updated user info
+            getUI().ifPresent(ui -> ui.navigate(""));
+            
+        } catch (Exception ex) {
+            showError("⚠ Erreur: " + ex.getMessage());
+        }
+    }
+    
+    private void handleLogout() {
+        try {
+            // Clear session
+            VaadinSession.getCurrent().setAttribute(UserDTO.class, null);
+            VaadinSession.getCurrent().close();
+            
+            showSuccess("Déconnexion réussie");
+            
+            // Navigate to home page
+            getUI().ifPresent(ui -> {
+                ui.getPage().reload();
+            });
+            
+        } catch (Exception ex) {
+            showError("Erreur lors de la déconnexion: " + ex.getMessage());
+        }
+    }
+    
+    private void showInfo(String message) {
+        com.vaadin.flow.component.notification.Notification notification = 
+            com.vaadin.flow.component.notification.Notification.show("ℹ️ " + message, 3000, 
+            com.vaadin.flow.component.notification.Notification.Position.TOP_CENTER);
+        notification.addThemeVariants(
+            com.vaadin.flow.component.notification.NotificationVariant.LUMO_CONTRAST);
+    }
+    
+    private void showSuccess(String message) {
+        com.vaadin.flow.component.notification.Notification notification = 
+            com.vaadin.flow.component.notification.Notification.show(message, 4000, 
+            com.vaadin.flow.component.notification.Notification.Position.TOP_CENTER);
+        notification.addThemeVariants(
+            com.vaadin.flow.component.notification.NotificationVariant.LUMO_SUCCESS);
+    }
+    
+    private void showError(String message) {
+        com.vaadin.flow.component.notification.Notification notification = 
+            com.vaadin.flow.component.notification.Notification.show(message, 3000, 
+            com.vaadin.flow.component.notification.Notification.Position.MIDDLE);
+        notification.addThemeVariants(
+            com.vaadin.flow.component.notification.NotificationVariant.LUMO_ERROR);
     }
 }

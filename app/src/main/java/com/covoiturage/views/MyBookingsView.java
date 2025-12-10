@@ -5,7 +5,9 @@ import java.util.List;
 
 import com.covoiturage.dto.BookingDTO;
 import com.covoiturage.dto.UserDTO;
+import com.covoiturage.security.SecurityService;
 import com.covoiturage.service.BookingService;
+import com.covoiturage.service.UserService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
@@ -13,27 +15,46 @@ import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.VaadinSession;
 
 @Route("my-bookings")
 @PageTitle("Mes réservations - Covoiturage")
 public class MyBookingsView extends VerticalLayout {
     
     private BookingService bookingService;
+    private SecurityService securityService;
+    private UserService userService;
     private UserDTO currentUser;
     
     private Grid<BookingDTO> bookingsGrid;
     
-    public MyBookingsView(BookingService bookingService) {
+    public MyBookingsView(BookingService bookingService, SecurityService securityService, UserService userService) {
         this.bookingService = bookingService;
+        this.securityService = securityService;
+        this.userService = userService;
         
-        currentUser = (UserDTO) VaadinSession.getCurrent().getAttribute("currentUser");
-        if (currentUser == null) {
+        if (!securityService.isAuthenticated()) {
             Notification.show("Vous devez être connecté", 3000, Notification.Position.MIDDLE);
-            getUI().ifPresent(ui -> ui.navigate(LoginView.class));
+            getUI().ifPresent(ui -> ui.navigate("login"));
+            return;
+        }
+        
+        // Get current user from service
+        try {
+            Long userId = securityService.getAuthenticatedUserId();
+            if (userId != null) {
+                currentUser = userService.getUserById(userId);
+            }
+        } catch (Exception e) {
+            currentUser = null;
+        }
+        
+        if (currentUser == null) {
+            Notification.show("Erreur de chargement du profil", 3000, Notification.Position.MIDDLE);
+            getUI().ifPresent(ui -> ui.navigate("login"));
             return;
         }
         
@@ -97,7 +118,7 @@ public class MyBookingsView extends VerticalLayout {
         
         grid.addColumn(BookingDTO::getSeatsBooked)
             .setHeader("Places")
-            .setWidth("80px")
+            .setWidth("150px")
             .setFlexGrow(0);
         
         grid.addComponentColumn(booking -> {
@@ -143,11 +164,11 @@ public class MyBookingsView extends VerticalLayout {
                 .set("display", "inline-block");
             
             return statusBadge;
-        }).setHeader("Statut").setWidth("140px").setFlexGrow(0);
+        }).setHeader("Statut").setWidth("180px").setFlexGrow(0);
         
         grid.addColumn(booking -> 
             booking.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM HH:mm"))
-        ).setHeader("Réservé le").setWidth("120px").setFlexGrow(0);
+        ).setHeader("Réservé le").setWidth("200px").setFlexGrow(0);
         
         grid.addComponentColumn(booking -> {
             if (booking.getMessageToDriver() != null && !booking.getMessageToDriver().isEmpty()) {
@@ -162,6 +183,9 @@ public class MyBookingsView extends VerticalLayout {
         }).setHeader("Message").setWidth("80px").setFlexGrow(0);
         
         grid.addComponentColumn(booking -> {
+            HorizontalLayout actions = new HorizontalLayout();
+            actions.setSpacing(true);
+            
             Button viewButton = new Button("Voir", VaadinIcon.EYE.create());
             viewButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_PRIMARY);
             viewButton.addClickListener(e -> {
@@ -169,8 +193,19 @@ public class MyBookingsView extends VerticalLayout {
                     getUI().ifPresent(ui -> ui.navigate(TripDetailsView.class, booking.getTripId()));
                 }
             });
-            return viewButton;
-        }).setHeader("Action").setAutoWidth(true);
+            
+            // Add cancel button for pending and accepted bookings
+            if ("pending".equals(booking.getStatus()) || "accepted".equals(booking.getStatus())) {
+                Button cancelButton = new Button("Annuler", VaadinIcon.CLOSE.create());
+                cancelButton.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_ERROR);
+                cancelButton.addClickListener(e -> handleCancelBooking(booking));
+                actions.add(viewButton, cancelButton);
+            } else {
+                actions.add(viewButton);
+            }
+            
+            return actions;
+        }).setHeader("Actions").setAutoWidth(true);
         
         return grid;
     }
@@ -189,5 +224,25 @@ public class MyBookingsView extends VerticalLayout {
             Notification.show("Erreur: " + ex.getMessage(), 
                             3000, Notification.Position.MIDDLE);
         }
+    }
+    
+    private void handleCancelBooking(BookingDTO booking) {
+        try {
+            bookingService.cancelBooking(booking.getId(), currentUser.getId());
+            showSuccess("Réservation annulée avec succès");
+            loadMyBookings(); // Reload the bookings list
+        } catch (Exception ex) {
+            showError("Erreur lors de l'annulation: " + ex.getMessage());
+        }
+    }
+    
+    private void showSuccess(String message) {
+        Notification notification = Notification.show("✓ " + message, 3000, Notification.Position.TOP_CENTER);
+        notification.addThemeVariants(com.vaadin.flow.component.notification.NotificationVariant.LUMO_SUCCESS);
+    }
+    
+    private void showError(String message) {
+        Notification notification = Notification.show("⚠ " + message, 3000, Notification.Position.MIDDLE);
+        notification.addThemeVariants(com.vaadin.flow.component.notification.NotificationVariant.LUMO_ERROR);
     }
 }

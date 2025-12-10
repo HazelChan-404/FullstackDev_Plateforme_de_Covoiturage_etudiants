@@ -339,7 +339,11 @@ public class TripDetailsView extends VerticalLayout implements HasUrlParameter<L
         UserDTO currentUser = (UserDTO) VaadinSession.getCurrent().getAttribute("currentUser");
         if (currentUser == null) {
             showError("Vous devez être connecté pour réserver");
-            getUI().ifPresent(ui -> ui.navigate(LoginView.class));
+            getUI().ifPresent(ui -> {
+                // Store the current trip ID in session for redirect after login
+                ui.getSession().setAttribute("redirectAfterLogin", "/trip/" + tripId);
+                ui.navigate(LoginView.class);
+            });
             return;
         }
         

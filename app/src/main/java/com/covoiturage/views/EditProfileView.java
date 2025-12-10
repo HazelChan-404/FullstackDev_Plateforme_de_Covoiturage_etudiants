@@ -1,6 +1,7 @@
 package com.covoiturage.views;
 
 import com.covoiturage.dto.UserDTO;
+import com.covoiturage.security.SecurityService;
 import com.covoiturage.service.UserService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -17,13 +18,13 @@ import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.VaadinSession;
 
 @Route("edit-profile")
 @PageTitle("Modifier mon profil - Covoiturage")
 public class EditProfileView extends VerticalLayout {
     
     private UserService userService;
+    private SecurityService securityService;
     private UserDTO currentUser;
     
     private TextField firstNameField;
@@ -34,13 +35,29 @@ public class EditProfileView extends VerticalLayout {
     private Button saveButton;
     private Button cancelButton;
     
-    public EditProfileView(UserService userService) {
+    public EditProfileView(UserService userService, SecurityService securityService) {
         this.userService = userService;
+        this.securityService = securityService;
         
-        currentUser = (UserDTO) VaadinSession.getCurrent().getAttribute("currentUser");
-        if (currentUser == null) {
+        if (!securityService.isAuthenticated()) {
             Notification.show("Vous devez être connecté", 3000, Notification.Position.MIDDLE);
-            getUI().ifPresent(ui -> ui.navigate(LoginView.class));
+            getUI().ifPresent(ui -> ui.navigate("login"));
+            return;
+        }
+        
+        // Get current user from service
+        try {
+            Long userId = securityService.getAuthenticatedUserId();
+            if (userId != null) {
+                currentUser = userService.getUserById(userId);
+            }
+        } catch (Exception e) {
+            currentUser = null;
+        }
+        
+        if (currentUser == null) {
+            Notification.show("Erreur de chargement du profil", 3000, Notification.Position.MIDDLE);
+            getUI().ifPresent(ui -> ui.navigate("login"));
             return;
         }
         
@@ -193,7 +210,7 @@ public class EditProfileView extends VerticalLayout {
                 bio
             );
             
-            VaadinSession.getCurrent().setAttribute("currentUser", updatedUser);
+            // Update session if needed (though SecurityService handles this)
             
             Notification notification = Notification.show(
                 "✓ Profil mis à jour avec succès! 🎉",

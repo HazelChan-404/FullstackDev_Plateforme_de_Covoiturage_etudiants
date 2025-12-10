@@ -6,8 +6,10 @@ import java.util.List;
 
 import com.covoiturage.dto.TripDTO;
 import com.covoiturage.dto.UserDTO;
+import com.covoiturage.security.SecurityService;
 import com.covoiturage.service.BookingService;
 import com.covoiturage.service.TripService;
+import com.covoiturage.service.UserService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.datepicker.DatePicker;
@@ -25,6 +27,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.data.provider.Query;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.VaadinSession;
@@ -35,6 +38,8 @@ public class SearchTripsView extends VerticalLayout {
     
     private TripService tripService;
     private BookingService bookingService;
+    private SecurityService securityService;
+    private UserService userService;
     
     private TextField departureCityField;
     private TextField arrivalCityField;
@@ -42,9 +47,11 @@ public class SearchTripsView extends VerticalLayout {
     private Button searchButton;
     private Grid<TripDTO> resultsGrid;
     
-    public SearchTripsView(TripService tripService, BookingService bookingService) {
+    public SearchTripsView(TripService tripService, BookingService bookingService, SecurityService securityService, UserService userService) {
         this.tripService = tripService;
         this.bookingService = bookingService;
+        this.securityService = securityService;
+        this.userService = userService;
         
         setSizeFull();
         setPadding(false);
@@ -73,6 +80,9 @@ public class SearchTripsView extends VerticalLayout {
         
         // Load all trips initially
         loadAllActiveTrips();
+        
+        // Check for pending booking after login
+        checkPendingBooking();
     }
     
     private Div createSearchForm() {
@@ -150,21 +160,22 @@ public class SearchTripsView extends VerticalLayout {
         
         grid.addColumn(trip -> 
             trip.getDepartureDatetime().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
-        ).setHeader("Date").setWidth("150px").setFlexGrow(0);
+        ).setHeader("Date").setWidth("180px").setFlexGrow(0);
         
         grid.addColumn(TripDTO::getAvailableSeats)
             .setHeader("Places")
-            .setWidth("80px")
+            .setWidth("150px")
             .setFlexGrow(0);
         
         grid.addColumn(trip -> trip.getPricePerSeat() + "€")
             .setHeader("Prix")
-            .setWidth("100px")
+            .setWidth("150px")
             .setFlexGrow(0);
         
         grid.addColumn(TripDTO::getDriverName)
             .setHeader("Conducteur")
-            .setAutoWidth(true);
+            .setWidth("200px")
+            .setFlexGrow(0);
         
         grid.addComponentColumn(trip -> {
             Button viewButton = new Button("Voir", VaadinIcon.EYE.create());
@@ -189,7 +200,7 @@ public class SearchTripsView extends VerticalLayout {
             HorizontalLayout actions = new HorizontalLayout(viewButton, bookButton);
             actions.setSpacing(true);
             return actions;
-        }).setHeader("Actions").setWidth("200px").setFlexGrow(0);
+        }).setHeader("Actions").setWidth("400px").setFlexGrow(0);
         
         return grid;
     }
@@ -233,14 +244,14 @@ public class SearchTripsView extends VerticalLayout {
     }
     
     private void handleBooking(TripDTO trip) {
-        UserDTO currentUser = (UserDTO) VaadinSession.getCurrent().getAttribute("currentUser");
-        if (currentUser == null) {
+        if (!securityService.isAuthenticated()) {
             showError("Vous devez être connecté pour réserver");
-            getUI().ifPresent(ui -> ui.navigate(LoginView.class));
+            getUI().ifPresent(ui -> ui.navigate("login"));
             return;
         }
         
-        if (trip.getDriverId().equals(currentUser.getId())) {
+        UserDTO currentUser = securityService.getAuthenticatedUser();
+        if (currentUser == null || trip.getDriverId().equals(currentUser.getId())) {
             showError("Vous ne pouvez pas réserver votre propre trajet");
             return;
         }
@@ -294,7 +305,21 @@ public class SearchTripsView extends VerticalLayout {
                 
                 showSuccess("Réservation envoyée avec succès!");
                 dialog.close();
-                handleSearch();
+                // Refresh the results grid to update available seats
+                loadAllActiveTrips();
+                
+                // Navigate to MyBookingsView after successful booking with delay
+                getUI().ifPresent(ui -> {
+                    // Use a timer to ensure UI updates before navigation
+                    new java.util.Timer().schedule(new java.util.TimerTask() {
+                        @Override
+                        public void run() {
+                            ui.access(() -> {
+                                ui.navigate(MyBookingsView.class);
+                            });
+                        }
+                    }, 400); // 0.7 second delay
+                });
                 
             } catch (Exception ex) {
                 showError("Erreur: " + ex.getMessage());
@@ -332,5 +357,36 @@ public class SearchTripsView extends VerticalLayout {
     
     private void showInfo(String message) {
         Notification.show("ℹ " + message, 3000, Notification.Position.MIDDLE);
+    }
+    
+    private void checkPendingBooking() {
+        // Check if there's a pending booking from before login
+        Long pendingTripId = (Long) VaadinSession.getCurrent().getAttribute("pendingBookingTrip");
+        if (pendingTripId != null) {
+            // Clear the pending booking from session
+            VaadinSession.getCurrent().setAttribute("pendingBookingTrip", null);
+            
+            // Get current user
+            UserDTO currentUser = VaadinSession.getCurrent().getAttribute(UserDTO.class);
+            if (currentUser != null) {
+                try {
+                    // Load the trip and proceed with booking directly
+                    TripDTO trip = tripService.getTripById(pendingTripId);
+                    if (trip != null) {
+                        // Use Java Timer to delay the dialog opening
+                        new java.util.Timer().schedule(new java.util.TimerTask() {
+                            @Override
+                            public void run() {
+                                getUI().ifPresent(ui -> ui.access(() -> {
+                                    handleBooking(trip);
+                                }));
+                            }
+                        }, 1500); // 1.5 second delay
+                    }
+                } catch (Exception e) {
+                    showError("Erreur lors du chargement du trajet: " + e.getMessage());
+                }
+            }
+        }
     }
 }

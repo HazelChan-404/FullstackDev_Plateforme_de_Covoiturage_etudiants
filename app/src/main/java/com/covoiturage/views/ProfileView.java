@@ -329,11 +329,34 @@ public class ProfileView extends VerticalLayout implements HasUrlParameter<Long>
             editButton.addClickListener(e -> 
                 getUI().ifPresent(ui -> ui.navigate(EditProfileView.class))
             );
-            buttons.add(backButton, editButton);
+            
+            Button logoutButton = new Button("🚪 Déconnexion", VaadinIcon.SIGN_OUT.create());
+            logoutButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+            logoutButton.getStyle().set("font-weight", "600").set("color", "#ef4444");
+            logoutButton.addClickListener(e -> handleLogout());
+            
+            buttons.add(backButton, editButton, logoutButton);
         } else {
             buttons.add(backButton);
         }
         
         return buttons;
+    }
+    
+    private void handleLogout() {
+        try {
+            // Clear session
+            VaadinSession.getCurrent().setAttribute(UserDTO.class, null);
+            VaadinSession.getCurrent().close();
+            
+            // Navigate to home page
+            getUI().ifPresent(ui -> {
+                ui.getPage().reload();
+            });
+            
+        } catch (Exception ex) {
+            Notification.show("Erreur lors de la déconnexion: " + ex.getMessage(), 
+                            3000, Notification.Position.MIDDLE);
+        }
     }
 }
