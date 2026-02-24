@@ -1,18 +1,20 @@
+# Server
 server.port=${PORT:8080}
+
+# Logging
 logging.level.org.atmosphere=warn
 
-# Launch the default browser when starting the application in development mode
+# Vaadin
 vaadin.launch-browser=true
-
-# To improve the performance while developing
-# For more information https://vaadin.com/docs/latest/flow/integrations/spring/configuration#special-configuration-parameters
 vaadin.allowed-packages=com.vaadin,org.vaadin,com.flowingcode,com.covoiturage
 
-# MySQL Database Configuration
+# MySQL - Configurez selon votre environnement
 spring.datasource.url=jdbc:mysql://localhost:3306/covoiturage_full_stack
 spring.datasource.username=root
-spring.datasource.password=Youcandoit_123
+spring.datasource.password=VOTRE_MOT_DE_PASSE
 spring.datasource.driverClassName=com.mysql.cj.jdbc.Driver
+
+# JPA / Hibernate
 spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
 spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
+spring.jpa.show-sql=false
